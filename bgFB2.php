@@ -22,7 +22,6 @@ class bgFB2 {
 		$сhtml = new BgClearHTML();
 		
 		// Массив разрешенных тегов и атрибутов 
-//		$allow_attributes = array ();
 		$allow_attributes = $сhtml->strtoarray ( BG_FB2_TAGS );
 		// Оставляем в тексте только разрешенные теги и атрибуты
 		$content = $сhtml->prepare ($content, $allow_attributes);
@@ -335,11 +334,11 @@ $this->images ($content, $options).
 		$listattr =	explode( ",", $str );
 		foreach ($listattr as $attr) {
 			preg_match('/(&#?[a-z0-9]+;)(\[(.*?)\])?/is', $attr, $mt);
-			if (isset($mt[3])) $allow_attributes[$mt[1]] = $mt[3];
-			else $allow_attributes[$mt[1]] = "";
+			if (isset($mt[3])) $allow_entities[$mt[1]] = $mt[3];
+			else $allow_entities[$mt[1]] = "";
 		}
 		// Ищем все вхождения HTML-сущностей
-		preg_match_all('/&[a-z0-9]+;/is', $content, $matches, PREG_OFFSET_CAPTURE);
+		preg_match_all('/&#?[a-z0-9]+;/is', $content, $matches, PREG_OFFSET_CAPTURE);
 		$text = "";
 		$start = 0;
 		$cnt = count($matches[0]);
@@ -364,8 +363,8 @@ $this->images ($content, $options).
 	function checkentity($mt, $allow_entities) {
 		foreach ($allow_entities as $entity => $symbols){
 			if ($entity == $mt) {
-				if (is_null($symbols)) return $entity;	// Если задана замена, замещаем на символы
-				else return $symbols;					// иначе, оставляем HTML-сущность
+				if ($symbols == "") return $entity;		// Если не задана замена, оставляем HTML-сущность
+				else return $symbols;					// иначе, замещаем на символы
 			}
 		}
 		return '';										// Остальные HTML-сущности удаляем
