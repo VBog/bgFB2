@@ -92,6 +92,15 @@ $this->images ($content, $options).
 		return $content;
 	}
 	function body ($content, $options) {
+		// Заменяем заголовки на жирный текст в ячейках таблиц
+		$content = preg_replace_callback('/(<td([^>]*?)>)(.*?)(<\/td>)/is', 
+				function ($matches) {
+					$content = $matches[3];
+					$content = preg_replace('/<h([^>]*?)>/is', '<p><strong>',  $content);
+					$content = preg_replace('/<\/h([^>]*?)>/is', '</strong></p>',  $content);
+					return $matches[1].$content.$matches[4];
+				}, $content);
+		
 		
 		// Разбиваем текст на секции
 		$template = '/<h([1-3])(.*?)<\/h\1\>/is';
@@ -133,7 +142,7 @@ $this->images ($content, $options).
 		$content = preg_replace_callback('/(<title>)(.*?)(<\/title>)/is', 
 				function ($matches) {
 					$fb2 = new bgFB2();
-					$content = $fb2->section ($matches[2]);
+					$content = $fb2->section ($matches[2], $options);
 					return $matches[1].$content.$matches[3];
 				}, $content);
 
@@ -141,7 +150,7 @@ $this->images ($content, $options).
 		$content = preg_replace_callback('/(<\/title>)(.*?)(<\/?section>)/is', 
 				function ($matches) {
 					$fb2 = new bgFB2();
-					$content = $fb2->section ($matches[2]);
+					$content = $fb2->section ($matches[2], $options);
 					return $matches[1].$content.$matches[3];
 				}, $content);
 		// Удаляем лишнее
@@ -151,7 +160,7 @@ $this->images ($content, $options).
 		return $content;
 	}
 	
-	function section ($content) {
+	function section ($content, $options) {
 		
 		// Преобразуем элементы оформления текста
 		$content = str_replace('<b>', '<strong>',  $content);
@@ -221,8 +230,10 @@ $this->images ($content, $options).
 		$content = str_replace('<empty-line/>', '</p><empty-line/><p>',  $content);
 		$content = preg_replace('/<cite([^>]*?)>/is', '</p><cite\1><p>',  $content);
 		$content = str_replace('</cite>', '</p></cite><p>',  $content);
-		$content = preg_replace('/<table([^>]*?)>/is', '</p><table\1><p>',  $content);
-		$content = str_replace('</table>', '</p></table><p>',  $content);
+		$content = preg_replace('/<table([^>]*?)>/is', '</p><table\1>',  $content);
+		$content = str_replace('</table>', '</table><p>',  $content);
+		$content = preg_replace('/<td([^>]*?)>/is', '<td\1><p>',  $content);
+		$content = str_replace('</td>', '</p></td>',  $content);
 		$content = '<p>'.$content.'</p>';
 
 		// Убираем лишние <p> и </p>
@@ -230,10 +241,12 @@ $this->images ($content, $options).
 		$content = preg_replace('/<p([^>]*?)>\s*<p([^>]*?)>/is', '<p\1>',  $content);
 		$content = preg_replace('/<\/p>\s*<\/p>/is', '</p>',  $content);
 		$content = preg_replace('/<p>\s*<\/p>/is', '',  $content);
+		
+		if (!$options['allow_p']) {
 		// В ячейках таблиц абзацы запрещены
-		$content = preg_replace_callback('/(<td>)(.*?)(<\/td>)/is', 
+			$content = preg_replace_callback('/(<td([^>]*?)>)(.*?)(<\/td>)/is', 
 				function ($matches) {
-					$content = $matches[2];
+					$content = $matches[3];
 					$content = preg_replace('/<\/p><p([^>]*?)>/is', ' ',  $content);
 					$content = preg_replace('/<p([^>]*?)>/is', '',  $content);
 					$content = preg_replace('/<\/p>/is', '',  $content);
@@ -241,9 +254,9 @@ $this->images ($content, $options).
 					$content = preg_replace('/<\/subtitle>/is', '',  $content);
 					$content = preg_replace('/<cite([^>]*?)>/is', '',  $content);
 					$content = preg_replace('/<\/cite>/is', '',  $content);
-					return $matches[1].$content.$matches[3];
+					return $matches[1].$content.$matches[4];
 				}, $content);
-
+		}
 		// Якори выносим в отдельный тег
 		$content = preg_replace_callback('/<a\s+([^>]*?)>/is', 
 			function ($match) {
