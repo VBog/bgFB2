@@ -4,7 +4,10 @@
 
 ******************************************************************************************/
 class bgFB2 {
+	public $options = null;
 	public function prepare ($content, $options) {
+		
+		$this->options = $options;
 		
 		// Разрешенные HTML-теги для FB2
 		define( 'BG_FB2_TAGS',
@@ -142,7 +145,7 @@ $this->images ($content, $options).
 		$content = preg_replace_callback('/(<title>)(.*?)(<\/title>)/is', 
 				function ($matches) {
 					$fb2 = new bgFB2();
-					$content = $fb2->section ($matches[2], $options);
+					$content = $fb2->section ($matches[2], $this->options);
 					return $matches[1].$content.$matches[3];
 				}, $content);
 
@@ -150,7 +153,7 @@ $this->images ($content, $options).
 		$content = preg_replace_callback('/(<\/title>)(.*?)(<\/?section>)/is', 
 				function ($matches) {
 					$fb2 = new bgFB2();
-					$content = $fb2->section ($matches[2], $options);
+					$content = $fb2->section ($matches[2], $this->options);
 					return $matches[1].$content.$matches[3];
 				}, $content);
 		// Удаляем лишнее
@@ -241,7 +244,7 @@ $this->images ($content, $options).
 		$content = preg_replace('/<p([^>]*?)>\s*<p([^>]*?)>/is', '<p\1>',  $content);
 		$content = preg_replace('/<\/p>\s*<\/p>/is', '</p>',  $content);
 		$content = preg_replace('/<p>\s*<\/p>/is', '',  $content);
-		
+
 		if (!$options['allow_p']) {
 		// В ячейках таблиц абзацы запрещены
 			$content = preg_replace_callback('/(<td([^>]*?)>)(.*?)(<\/td>)/is', 
