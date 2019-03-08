@@ -14,7 +14,7 @@ class bgFB2 {
 		"img[src|alt],div[id],blockquote[id],
 		h1[id],h2[id],h3[id],h4[id],h5[id],h6[id],
 		hr,p[id],br,li[id],a[href|name|id],
-		table[id],tr[align],th[id|colspan|rowspan|align],td[id|colspan|rowspan|align],
+		table[id],tr[align|valign],th[id|colspan|rowspan|align|valign],td[id|colspan|rowspan|align|valign],
 		b,strong,i,em,sub,sup,s,strike,code");
 		// Разрешенные HTML-сущности для FB2
 		define( 'BG_FB2_ENTITIES',
@@ -31,16 +31,19 @@ class bgFB2 {
 
 		// Заменяем HTML-сущности
 		$content = $this->replaceEntities( $content, BG_FB2_ENTITIES );
+		
+		// Удаляем переносы строк
+		$content = str_replace(PHP_EOL, '',  $content);
 
 		/* Преобразуем html в fb2 */
 		$content = '<?xml version="1.0" encoding="UTF-8"?>'. PHP_EOL .
 '<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0" xmlns:l="http://www.w3.org/1999/xlink">'. PHP_EOL .
 '<stylesheet type="text/css">' .$options['css']. '</stylesheet>'. PHP_EOL .
-$this->discription ($content, $options).
-'<body>'. PHP_EOL .
-'<title><p>' .$options['title']. '</p></title>'. PHP_EOL .
+$this->discription ($content, $options).PHP_EOL .
+PHP_EOL . '<body>'. PHP_EOL .
+'<title><p>' .$options['title']. '</p></title>'. 
 $this->body ($content, $options).
-'</body>'. PHP_EOL .
+PHP_EOL . '</body>'. PHP_EOL .
 (($options['cover'])?$this->create_binary($options['cover']):'').
 $this->images ($content, $options).
 '</FictionBook>';
@@ -52,6 +55,8 @@ $this->images ($content, $options).
 			$content = str_replace('</'.$tag.'>', '</'.$tag.'>'. PHP_EOL,  $content);
 		}
 		$content = str_replace('<empty-line/>', '<empty-line/>'. PHP_EOL,  $content);
+		$content = str_replace('<section>', '<section>'. PHP_EOL,  $content);
+		$content = str_replace('<title>', '<title>'. PHP_EOL,  $content);
 		
 		unset($сhtml);
 		$сhtml=NULL;
@@ -109,7 +114,7 @@ $this->images ($content, $options).
 		$template = '/<h([1-3])(.*?)<\/h\1\>/is';
 		preg_match_all($template, $content, $matches, PREG_OFFSET_CAPTURE);
 
-		$text = "";
+		$text = '<section><title></title>';
 		$start = 0;
 		$prev_level = 1;
 		$num_sections = 1;
@@ -121,12 +126,18 @@ $this->images ($content, $options).
 			$pos = strpos ( $mt[2], '>' );
 			$attr = ($pos>0)?substr( $mt[2], 0, $pos ):'';
 			$txt = substr ( $mt[2], $pos+1 );
-			$section = '<section'.$attr.'><title>'.$txt.'</title>';
+			$section = '</section><section'.$attr.'><title>'.$txt.'</title><section><title></title>';
 			if ($prev_level >= $level) {
 				$num_ends = $prev_level - $level + 1;
 				if ($num_sections < $num_ends) $num_ends = $num_sections;
 				for ($n=0; $n < $num_ends; $n++) {
-					$section = '</section>'.$section;
+					if (substr($text, -32) == '</title><section><title></title>') {
+						// Удаляем в конце строки <section><title></title>
+						$text = substr_replace($text, '', -24);
+					} else {
+						// Иначе закрываем секцию
+						$section = '</section>'.$section;
+					}
 					$num_sections--;
 				}
 			}
@@ -135,31 +146,36 @@ $this->images ($content, $options).
 			$start = $matches[0][$i][1] + strlen($matches[0][$i][0]);
 			$prev_level = $level;
 		}
+		if (substr($text, -32) == '</title><section><title></title>') {
+			// Удаляем в конце строки <section><title></title>
+			$text = substr_replace($text, '', -24);
+			$num_sections--;
+		}
 		$content = $text.substr($content, $start);
-
 		// Обрамляем тегом <section>
 		$content = '<section><title></title>'.$content;
-		for ($n=0; $n < $num_sections; $n++) $content .= '</section>';
+		for ($n=0; $n < $num_sections+1; $n++) $content .= '</section>';
 
 		// Обрабатываем заголовки секций
 		$content = preg_replace_callback('/(<title>)(.*?)(<\/title>)/is', 
-				function ($matches) {
-					$fb2 = new bgFB2();
-					$content = $fb2->section ($matches[2], $this->options);
-					return $matches[1].$content.$matches[3];
-				}, $content);
+			function ($matches) {
+				$fb2 = new bgFB2();
+				$content = $fb2->section ($matches[2], $this->options);
+				return $matches[1].$content.$matches[3];
+			}, $content);
 
 		// Обрабатываем внутри секций
-		$content = preg_replace_callback('/(<\/title>)(.*?)(<\/?section>)/is', 
-				function ($matches) {
-					$fb2 = new bgFB2();
-					$content = $fb2->section ($matches[2], $this->options);
-					return $matches[1].$content.$matches[3];
-				}, $content);
+		$content = preg_replace_callback('/(<\/title>)(.*?)(<\/?section)/is', 
+			function ($matches) {
+				$fb2 = new bgFB2();
+				$content = $fb2->section ($matches[2], $this->options);
+				return $matches[1].$content.$matches[3];
+			}, $content);
 		// Удаляем лишнее
 		$content = preg_replace('/<title>\s*<\/title>/is', '',  $content);
 		$content = preg_replace('/<section>\s*<\/section>/is', '',  $content);
-		
+		$content = preg_replace('/<section>\s*<\/section>/is', '',  $content);
+
 		return $content;
 	}
 	
@@ -249,6 +265,8 @@ $this->images ($content, $options).
 		$content = preg_replace('/<p([^>]*?)>\s*<p([^>]*?)>/is', '<p\1>',  $content);
 		$content = preg_replace('/<\/p>\s*<\/p>/is', '</p>',  $content);
 		$content = preg_replace('/<p>\s*<\/p>/is', '',  $content);
+		$content = preg_replace('/<p>\s*<\/p>/is', '',  $content);
+		$content = str_replace(PHP_EOL . PHP_EOL, PHP_EOL,  $content);
 		
 		if (!$options['allow_p']) {
 		// В ячейках таблиц абзацы запрещены
@@ -301,6 +319,12 @@ $this->images ($content, $options).
 		//$this->images ($content, $options).
 		
 		$upload_dir = (object) wp_upload_dir();
+		$schema = (@$_SERVER["HTTPS"] == "on") ? "https:" : "http:";
+		$domain = '//'.$_SERVER["SERVER_NAME"];
+		if($_SERVER["SERVER_PORT"] != "80" && $_SERVER["SERVER_PORT"] != "443")	$domain .= ":".$_SERVER["SERVER_PORT"];
+		$currentURL = $schema.$domain;
+		$rootURI = $_SERVER['DOCUMENT_ROOT'];
+		
 		$template = '/<img\s+([^>]*?)src\s*=\s*([\"\'])([^>]*?)(\2)/is';
 		preg_match_all($template, $content, $matches, PREG_OFFSET_CAPTURE);
 
@@ -308,7 +332,14 @@ $this->images ($content, $options).
 		$cnt = count($matches[0]);
 		for ($i=0; $i<$cnt; $i++) {
 			preg_match($template, $matches[0][$i][0], $mt);
-			$path = str_replace ($upload_dir->baseurl, $upload_dir->basedir, $mt[3]);
+			$path = $mt[3];
+			if ($path[0] == '/' && $path[1] != '/') $path = $currentURL.$path; // Задан путь относительно root
+			if( !ini_get('allow_url_fopen')) {	// В случае если allow_url_fopen запрещено на сервере
+				if ( substr($path,0,4) == 'http' )
+					$path = str_replace ($currentURL, $rootURI, $path);
+				elseif ( substr($path,0,2) == '//' )
+					$path = str_replace ($domain, $rootURI, $path);
+			} 			
 			$text .= $this->create_binary($path);
 		}
 
@@ -400,7 +431,7 @@ $this->images ($content, $options).
 		$newtext = '';
 
 		// Теги форматирования текста
-		$text_formatting_tags = array( 'strong', 'emphasis', 'u', 'strikethrough', 'sup', 'sub', 'code' );
+		$text_formatting_tags = array( 'strong', 'emphasis', 'u', 'strikethrough', 'sup', 'sub', 'code', 'a' );
 
 		$text = preg_replace('#<br([^>]*?)>(\r?\n?)+#is', '<br>',  $text);
 		// Просмотрим все теги
@@ -424,7 +455,7 @@ $this->images ($content, $options).
 				}
 			} else { // Открывающий тег
 				$tagname = strtolower($regex[1]);
-				$tag = '<'.$tagname.'>';
+				$tag = '<'.$tagname.(($regex[2])?(' '.$regex[2]):"").'>';
 			
 				// Если это тег форматирования текста
 				if ( in_array( $tagname, $text_formatting_tags ) ) {
